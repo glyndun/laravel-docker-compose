@@ -1,0 +1,77 @@
+version: "3.8"
+services:
+  shopime_app:
+    container_name: shopime_app
+    build:
+      context: .
+      dockerfile: ./docker/php/Dockerfile
+    expose:
+      - 9000
+    volumes:
+      - .:/home/glyndun/projects/shopime
+      - ./public:/home/glyndun/projects/shopime/public
+    depends_on:
+      - shopime_db
+    networks:
+      - app_network
+
+  shopime_nginx:
+    container_name: shopime_nginx
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile
+    volumes:
+    - ./public:/home/glyndun/projects/shopime/public
+    - ./storage/app:/home/glyndun/projects/shopime/storage/app
+    ports:
+      - 8000:80
+    depends_on:
+      - shopime_app
+    environment:
+      NGINX_FPM_HOST: shopime_app
+      NGINX_ROOT: /home/glyndun/projects/shopime/public
+    networks:
+      - app_network
+
+  shopime_db:
+    container_name: shopime_db
+    image: mysql:8.0.20
+    restart: always
+    volumes:
+      - ./storage/db-data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: shopime
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+    networks:
+      - app_network
+
+  shopime_mailhog:
+    image: 'mailhog/mailhog:latest'
+    ports:
+      - '${FORWARD_MAILHOG_PORT:-1025}:1025'
+      - '${FORWARD_MAILHOG_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - app_network
+
+  shopime_pma:
+    image: phpmyadmin/phpmyadmin
+    container_name: shopime_pma
+    links:
+      - shopime_db
+    environment:
+      PMA_HOST: shopime_db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    restart: always
+    ports:
+        - 8081:80
+    networks:
+        - app_network
+
+networks:
+  app_network:
+    driver: bridge
